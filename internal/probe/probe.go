@@ -108,6 +108,9 @@ Loop:
 					}
 
 					fmt.Printf("%q %s: T=%.2f H=%d%% B=%d%%\n", name, addr, float32(sd.Temperature)/10.0, sd.Humidity, sd.Battery)
+					temperatureMetric.WithLabelValues(name).Set(float64(sd.Temperature) / 10.0)
+					humidityMetric.WithLabelValues(name).Set(float64(sd.Humidity))
+					batteryMetric.WithLabelValues(name).Set(float64(sd.Battery))
 				}
 			}
 		case sig := <-sigs:

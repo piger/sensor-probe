@@ -3,14 +3,17 @@ package main
 import (
 	"flag"
 	"log"
+	"net/http"
 
 	"github.com/piger/sensor-probe/internal/config"
 	"github.com/piger/sensor-probe/internal/probe"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
-	device     = flag.String("device", "hci0", "Bluetooth device")
-	configFile = flag.String("config", "sensor-probe.toml", "Path to the configuration file")
+	device      = flag.String("device", "hci0", "Bluetooth device")
+	configFile  = flag.String("config", "sensor-probe.toml", "Path to the configuration file")
+	metricsAddr = flag.String("metrics-addr", "localhost:30333", "Listen address to expose metrics")
 )
 
 func main() {
@@ -20,6 +23,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("error: %s", err)
 	}
+
+	http.Handle("/metrics", promhttp.Handler())
+	go func() {
+		if err := http.ListenAndServe(*metricsAddr, nil); err != nil {
+			log.Printf("http listener error: %s", err)
+		}
+	}()
 
 	probe := probe.New(*device, cfg)
 	if err := probe.Initialize(); err != nil {
