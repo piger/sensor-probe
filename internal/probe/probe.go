@@ -97,6 +97,10 @@ Loop:
 			}
 		case sig := <-sigs:
 			log.Printf("signal received: %s", sig)
+
+			if err := p.hostRadio.StopScanning(); err != nil {
+				log.Printf("error stopping scan: %s", err)
+			}
 			break Loop
 		}
 	}
