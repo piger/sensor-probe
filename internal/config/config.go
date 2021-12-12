@@ -38,8 +38,8 @@ func ReadConfig(filename string) (*Config, error) {
 		return nil, fmt.Errorf("parsing configuration file %q: %w", filename, err)
 	}
 
-	for _, sensor := range config.Sensors {
-		sensor.MAC = strings.ToUpper(sensor.MAC)
+	for i, sensor := range config.Sensors {
+		config.Sensors[i].MAC = strings.ToUpper(sensor.MAC)
 	}
 
 	return &config, nil
