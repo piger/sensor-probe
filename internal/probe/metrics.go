@@ -8,7 +8,7 @@ var (
 			Name: "sensor_probe_temperature",
 			Help: "The current temperature measured by the Xiaomi sensor",
 		},
-		[]string{"name"},
+		[]string{"name", "address"},
 	)
 
 	humidityMetric = prometheus.NewGaugeVec(
@@ -16,7 +16,7 @@ var (
 			Name: "sensor_probe_humidity",
 			Help: "The current humidity measured by the Xiaomi sensor",
 		},
-		[]string{"name"},
+		[]string{"name", "address"},
 	)
 
 	batteryMetric = prometheus.NewGaugeVec(
@@ -24,7 +24,7 @@ var (
 			Name: "sensor_probe_battery",
 			Help: "The battery level of the Xiaomi sensor",
 		},
-		[]string{"name"},
+		[]string{"name", "address"},
 	)
 )
 
