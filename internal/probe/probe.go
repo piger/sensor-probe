@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/piger/sensor-probe/internal/config"
@@ -71,6 +72,11 @@ func (p *Probe) Run() error {
 		return fmt.Errorf("building filters: %s", err)
 	}
 
+	nameMap := make(map[string]string)
+	for _, sensor := range p.config.Sensors {
+		nameMap[sensor.MAC] = sensor.Name
+	}
+
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
@@ -92,7 +98,16 @@ Loop:
 						continue // XXX
 					}
 
-					fmt.Printf("%s: T=%.2f H=%d%% B=%d%%\n", report.Address, float32(sd.Temperature)/10.0, sd.Humidity, sd.Battery)
+					addr := strings.ToUpper(report.Address.String())
+
+					var name string
+					if n, ok := nameMap[addr]; ok {
+						name = n
+					} else {
+						name = addr
+					}
+
+					fmt.Printf("%q %s: T=%.2f H=%d%% B=%d%%\n", name, addr, float32(sd.Temperature)/10.0, sd.Humidity, sd.Battery)
 				}
 			}
 		case sig := <-sigs:
