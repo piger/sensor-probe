@@ -89,30 +89,32 @@ Loop:
 	for {
 		select {
 		case report := <-reportChan:
-			for _, reportData := range report.Data {
-				if reportData.Typ == hci.AdServiceData {
-					buf := bytes.NewBuffer(reportData.Data)
-					var sd sensorData
-					if err := binary.Read(buf, binary.BigEndian, &sd); err != nil {
-						log.Printf("error parsing sensor data from %s: %s", report.Address, err)
-						continue // XXX
-					}
-
-					addr := strings.ToUpper(report.Address.String())
-
-					var name string
-					if n, ok := nameMap[addr]; ok {
-						name = n
-					} else {
-						name = addr
-					}
-
-					fmt.Printf("%q %s: T=%.2f H=%d%% B=%d%%\n", name, addr, float32(sd.Temperature)/10.0, sd.Humidity, sd.Battery)
-					temperatureMetric.WithLabelValues(name).Set(float64(sd.Temperature) / 10.0)
-					humidityMetric.WithLabelValues(name).Set(float64(sd.Humidity))
-					batteryMetric.WithLabelValues(name).Set(float64(sd.Battery))
-				}
+			serviceData := getServiceData(report)
+			if serviceData == nil {
+				continue
 			}
+
+			buf := bytes.NewBuffer(serviceData.Data)
+			var sd sensorData
+			if err := binary.Read(buf, binary.BigEndian, &sd); err != nil {
+				log.Printf("error parsing sensor data from %s: %s", report.Address, err)
+				continue
+			}
+
+			addr := strings.ToUpper(report.Address.String())
+
+			var name string
+			if n, ok := nameMap[addr]; ok {
+				name = n
+			} else {
+				name = addr
+			}
+
+			fmt.Printf("%q %s: T=%.2f H=%d%% B=%d%%\n", name, addr, float32(sd.Temperature)/10.0, sd.Humidity, sd.Battery)
+			temperatureMetric.WithLabelValues(name).Set(float64(sd.Temperature) / 10.0)
+			humidityMetric.WithLabelValues(name).Set(float64(sd.Humidity))
+			batteryMetric.WithLabelValues(name).Set(float64(sd.Battery))
+
 		case sig := <-sigs:
 			log.Printf("signal received: %s", sig)
 
@@ -141,4 +143,14 @@ func buildFilters(sensors []config.SensorConfig) ([]filter.AdFilter, error) {
 	}
 
 	return filters, nil
+}
+
+func getServiceData(report *host.ScanReport) *hci.AdStructure {
+	for _, reportData := range report.Data {
+		if reportData.Typ == hci.AdServiceData {
+			return reportData
+		}
+	}
+
+	return nil
 }
