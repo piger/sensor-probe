@@ -109,7 +109,7 @@ func buildFilters(sensors []config.SensorConfig) ([]filter.AdFilter, error) {
 	for i, sensor := range sensors {
 		baddr, err := hci.BtAddressFromString(sensor.MAC)
 		if err != nil {
-			return nil, fmt.Errorf("parsing MAC address %q: %s", sensor.MAC, err)
+			return nil, fmt.Errorf("parsing MAC address %q: %w", sensor.MAC, err)
 		}
 		addrFilters[i] = filter.ByAddress(baddr)
 	}
