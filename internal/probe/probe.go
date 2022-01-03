@@ -2,6 +2,7 @@ package probe
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/piger/sensor-probe/internal/config"
 	"gitlab.com/jtaimisto/bluewalker/filter"
@@ -30,6 +32,13 @@ type sensorData struct {
 	Battery      uint8
 	BatterymVolt uint16
 	FrameCounter uint8
+}
+
+type SensorStatus struct {
+	Temperature float32
+	Humidity    int
+	Battery     int
+	BatteryVolt int
 }
 
 func New(device string, config *config.Config) *Probe {
@@ -85,6 +94,13 @@ func (p *Probe) Run() error {
 		return fmt.Errorf("starting scan: %w", err)
 	}
 
+	currentValues := make(map[string]SensorStatus)
+	ticker := time.NewTicker(p.config.Interval.Duration)
+	defer ticker.Stop()
+
+	ctx := context.Background()
+	defer ctx.Done()
+
 Loop:
 	for {
 		select {
@@ -111,9 +127,30 @@ Loop:
 			}
 
 			fmt.Printf("%q %s: T=%.2f H=%d%% B=%d%%\n", name, addr, float32(sd.Temperature)/10.0, sd.Humidity, sd.Battery)
+
+			currentValues[name] = SensorStatus{
+				Temperature: float32(sd.Temperature) / 10.0,
+				Humidity:    int(sd.Humidity),
+				Battery:     int(sd.Battery),
+				BatteryVolt: int(sd.BatterymVolt),
+			}
+
 			temperatureMetric.WithLabelValues(name, addr).Set(float64(sd.Temperature) / 10.0)
 			humidityMetric.WithLabelValues(name, addr).Set(float64(sd.Humidity))
 			batteryMetric.WithLabelValues(name, addr).Set(float64(sd.Battery))
+
+		case t := <-ticker.C:
+			log.Printf("tick at %s", t)
+			now := t.UTC()
+
+			for name, status := range currentValues {
+				fmt.Printf("name=%s temperature=%.2f humidity=%d%% battery=%d batteryV=%d\n",
+					name, status.Temperature, status.Humidity, status.Battery, status.BatteryVolt)
+
+				if err := writeDBRow(ctx, now, name, status, p.config.DBConfig, "home_temperature"); err != nil {
+					log.Printf("error writing DB row: %s", err)
+				}
+			}
 
 		case sig := <-sigs:
 			log.Printf("signal received: %s", sig)

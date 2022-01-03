@@ -5,13 +5,16 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 )
 
 // Config is the main configuration of this program.
 type Config struct {
-	Sensors []SensorConfig `toml:"sensors"`
+	Sensors  []SensorConfig `toml:"sensors"`
+	Interval duration       `toml:"interval"`
+	DBConfig string         `toml:"dbconfig"`
 }
 
 // SensorConfig contains the configuration of a single sensor.
@@ -19,6 +22,16 @@ type SensorConfig struct {
 	Name     string
 	MAC      string
 	Firmware string
+}
+
+type duration struct {
+	time.Duration
+}
+
+func (i *duration) UnmarshalText(text []byte) error {
+	var err error
+	i.Duration, err = time.ParseDuration(string(text))
+	return err
 }
 
 func ReadConfig(filename string) (*Config, error) {
