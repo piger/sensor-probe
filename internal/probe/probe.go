@@ -16,7 +16,6 @@ import (
 	"github.com/brutella/hc"
 	"github.com/brutella/hc/accessory"
 	hcLog "github.com/brutella/hc/log"
-	"github.com/brutella/hc/service"
 	"github.com/mdp/qrterminal/v3"
 	"github.com/piger/sensor-probe/internal/config"
 	"gitlab.com/jtaimisto/bluewalker/filter"
@@ -41,7 +40,7 @@ type sensorData struct {
 }
 
 type SensorStatus struct {
-	Temperature float32
+	Temperature float64
 	Humidity    int
 	Battery     int
 	BatteryVolt int
@@ -126,20 +125,11 @@ func (p *Probe) Run() error {
 		}, 0, 0, 50, 1)
 	}
 
-	hkHumSensors := make(map[string]*service.HumiditySensor)
-	for _, sensor := range p.config.Sensors {
-		hkHumSensors[sensor.MAC] = service.NewHumiditySensor()
-	}
-
 	var hkAccs []*accessory.Accessory
 	for _, a := range hkSensors {
 		fmt.Printf("adding sensor %+v\n", a)
 		a.TempSensor.CurrentTemperature.SetValue(10)
 		hkAccs = append(hkAccs, a.Accessory)
-	}
-	for _, a := range hkHumSensors {
-		fmt.Printf("adding hum sensor %+v\n", a)
-
 	}
 
 	hkConfig := hc.Config{
@@ -191,20 +181,22 @@ Loop:
 				name = addr
 			}
 
-			fmt.Printf("%q %s: T=%.2f H=%d%% B=%d%%\n", name, addr, float32(sd.Temperature)/10.0, sd.Humidity, sd.Battery)
+			temperature := float64(sd.Temperature) / 10.0
+
+			fmt.Printf("%q %s: T=%.2f H=%d%% B=%d%%\n", name, addr, temperature, sd.Humidity, sd.Battery)
 
 			currentValues[name] = SensorStatus{
-				Temperature: float32(sd.Temperature) / 10.0,
+				Temperature: temperature,
 				Humidity:    int(sd.Humidity),
 				Battery:     int(sd.Battery),
 				BatteryVolt: int(sd.BatterymVolt),
 			}
 
 			if hks, ok := hkSensors[addr]; ok {
-				hks.TempSensor.CurrentTemperature.SetValue(float64(sd.Temperature) / 10.0)
+				hks.TempSensor.CurrentTemperature.SetValue(temperature)
 			}
 
-			temperatureMetric.WithLabelValues(name, addr).Set(float64(sd.Temperature) / 10.0)
+			temperatureMetric.WithLabelValues(name, addr).Set(temperature)
 			humidityMetric.WithLabelValues(name, addr).Set(float64(sd.Humidity))
 			batteryMetric.WithLabelValues(name, addr).Set(float64(sd.Battery))
 
