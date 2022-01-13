@@ -127,7 +127,7 @@ func (p *Probe) Run() error {
 
 	var hkAccs []*accessory.Accessory
 	for _, a := range hkSensors {
-		fmt.Printf("adding sensor %+v\n", a)
+		log.Printf("adding HomeKit sensor: %+v\n", a)
 		a.TempSensor.CurrentTemperature.SetValue(10)
 		hkAccs = append(hkAccs, a.Accessory)
 	}
