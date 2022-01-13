@@ -204,9 +204,6 @@ Loop:
 			now := t.UTC()
 
 			for name, status := range currentValues {
-				fmt.Printf("name=%s temperature=%.2f humidity=%d%% battery=%d batteryV=%d\n",
-					name, status.Temperature, status.Humidity, status.Battery, status.BatteryVolt)
-
 				if err := writeDBRow(ctx, now, name, status, p.config.DBConfig, "home_temperature"); err != nil {
 					log.Printf("error writing DB row: %s", err)
 				}
