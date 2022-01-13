@@ -179,6 +179,7 @@ Loop:
 
 			log.Printf("%q (%s): T=%.2f H=%d%% B=%d%%", name, addr, temperature, sd.Humidity, sd.Battery)
 
+			// Store current values for this sensor
 			currentValues[name] = SensorStatus{
 				Temperature: temperature,
 				Humidity:    int(sd.Humidity),
@@ -186,16 +187,18 @@ Loop:
 				BatteryVolt: int(sd.BatterymVolt),
 			}
 
+			// update temperature in HomeKit
 			if hks, ok := hkSensors[addr]; ok {
 				hks.TempSensor.CurrentTemperature.SetValue(temperature)
 			}
 
+			// update Prometheus metrics
 			temperatureMetric.WithLabelValues(name, addr).Set(temperature)
 			humidityMetric.WithLabelValues(name, addr).Set(float64(sd.Humidity))
 			batteryMetric.WithLabelValues(name, addr).Set(float64(sd.Battery))
 
 		case t := <-ticker.C:
-			log.Printf("tick at %s", t)
+			log.Print("sending current status to DB")
 			now := t.UTC()
 
 			for name, status := range currentValues {
@@ -210,10 +213,12 @@ Loop:
 		case sig := <-sigs:
 			log.Printf("signal received: %s", sig)
 
+			log.Print("stopping bluetooth scan")
 			if err := p.hostRadio.StopScanning(); err != nil {
 				log.Printf("error stopping scan: %s", err)
 			}
 
+			log.Print("stopping homekit server")
 			<-hkTransport.Stop()
 
 			break Loop
