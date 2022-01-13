@@ -17,6 +17,8 @@ var columnNames = []string{
 	"battery",
 }
 
+var dbConnTimeout = 1 * time.Minute
+
 func makeColumnString(names []string) string {
 	return strings.Join(names, ",")
 }
@@ -31,9 +33,12 @@ func makeValuesString(names []string) string {
 }
 
 func writeDBRow(ctx context.Context, t time.Time, room string, st SensorStatus, dburl, table string) error {
+	ctx, cancel := context.WithTimeout(ctx, dbConnTimeout)
+	defer cancel()
+
 	conn, err := pgx.Connect(ctx, dburl)
 	if err != nil {
-		return err
+		return fmt.Errorf("error connecting to DB: %w", err)
 	}
 	defer conn.Close(ctx)
 
@@ -48,7 +53,7 @@ func writeDBRow(ctx context.Context, t time.Time, room string, st SensorStatus, 
 		st.Humidity,
 		st.Battery,
 	); err != nil {
-		return err
+		return fmt.Errorf("error writing row to DB: %w", err)
 	}
 
 	return nil
