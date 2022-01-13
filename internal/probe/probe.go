@@ -23,12 +23,14 @@ import (
 	"gitlab.com/jtaimisto/bluewalker/host"
 )
 
+// Probe is the structure that holds the state of this program.
 type Probe struct {
 	device    string
 	config    *config.Config
 	hostRadio *host.Host
 }
 
+// sensorData represent a "status update" sent by a temperature sensor via BLE broadcasts.
 type sensorData struct {
 	UUID         uint16
 	MAC          [6]uint8
@@ -39,6 +41,8 @@ type sensorData struct {
 	FrameCounter uint8
 }
 
+// SensorStatus is used to keep track of each sensor's current status. This data will be periodically
+// sent to the database.
 type SensorStatus struct {
 	Temperature float64
 	Humidity    int
@@ -46,6 +50,8 @@ type SensorStatus struct {
 	BatteryVolt int
 }
 
+// New creates a new Probe object; it doesn't initialise the bluetooth device, which must be explicitly
+// initialised by calling p.Initialize().
 func New(device string, config *config.Config) *Probe {
 	p := Probe{
 		device: device,
@@ -55,6 +61,8 @@ func New(device string, config *config.Config) *Probe {
 	return &p
 }
 
+// Initialize initialises the Bluetooth device; please note that the bluetooth device must be "off"
+// when this function is called.
 func (p *Probe) Initialize() error {
 	raw, err := hci.Raw(p.device)
 	if err != nil {
@@ -72,6 +80,7 @@ func (p *Probe) Initialize() error {
 	return nil
 }
 
+// Run is this program's main loop.
 func (p *Probe) Run() error {
 	if p.hostRadio == nil {
 		if err := p.Initialize(); err != nil {
@@ -222,6 +231,8 @@ Loop:
 	return nil
 }
 
+// buildFilters builds a filter set for bluewalker to only capture events sent from devices
+// having the specified MAC addresses.
 func buildFilters(sensors []config.SensorConfig) ([]filter.AdFilter, error) {
 	addrFilters := make([]filter.AdFilter, len(sensors))
 	for i, sensor := range sensors {
@@ -239,6 +250,8 @@ func buildFilters(sensors []config.SensorConfig) ([]filter.AdFilter, error) {
 	return filters, nil
 }
 
+// getServiceData read a bluewalker report and returns a "Service Data" object
+// if found and nil otherwise.
 func getServiceData(report *host.ScanReport) *hci.AdStructure {
 	for _, reportData := range report.Data {
 		if reportData.Typ == hci.AdServiceData {
@@ -249,6 +262,9 @@ func getServiceData(report *host.ScanReport) *hci.AdStructure {
 	return nil
 }
 
+// parseReport parse a scan report from bluewalker and extracts a sensor's status data
+// and returns a sensorData object, the MAC address of the device, a boolean indicating wether any
+// data was found and an error.
 func parseReport(report *host.ScanReport) (*sensorData, string, bool, error) {
 	serviceData := getServiceData(report)
 	if serviceData == nil {
