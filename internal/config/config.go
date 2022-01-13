@@ -12,9 +12,16 @@ import (
 
 // Config is the main configuration of this program.
 type Config struct {
+	HomeKit  HomeKit        `toml:"homekit"`
 	Sensors  []SensorConfig `toml:"sensors"`
 	Interval duration       `toml:"interval"`
 	DBConfig string         `toml:"dbconfig"`
+}
+
+type HomeKit struct {
+	Pin     string `toml:"pin"`
+	Port    int    `toml:"port"`
+	SetupID string `toml:"setup_id"`
 }
 
 // SensorConfig contains the configuration of a single sensor.
