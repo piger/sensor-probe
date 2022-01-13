@@ -8,10 +8,16 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/brutella/hc"
+	"github.com/brutella/hc/accessory"
+	hcLog "github.com/brutella/hc/log"
+	"github.com/brutella/hc/service"
+	"github.com/mdp/qrterminal/v3"
 	"github.com/piger/sensor-probe/internal/config"
 	"gitlab.com/jtaimisto/bluewalker/filter"
 	"gitlab.com/jtaimisto/bluewalker/hci"
@@ -101,6 +107,65 @@ func (p *Probe) Run() error {
 	ctx := context.Background()
 	defer ctx.Done()
 
+	// initialise homekit
+	hcLog.Debug.Enable()
+	hkBridge := accessory.NewBridge(accessory.Info{
+		Name:         "Sensor Probe",
+		Manufacturer: "Kertesz Industries",
+		SerialNumber: "100",
+		Model:        "ABBESTIA",
+	})
+
+	hkSensors := make(map[string]*accessory.Thermometer)
+	for _, sensor := range p.config.Sensors {
+		hkSensors[sensor.MAC] = accessory.NewTemperatureSensor(accessory.Info{
+			Name:         sensor.Name,
+			Model:        "Xiaomi Thermometer LYWSD03MMC",
+			SerialNumber: "ABCDEFG",
+			Manufacturer: "Xiaomi",
+		}, 0, 0, 50, 1)
+	}
+
+	hkHumSensors := make(map[string]*service.HumiditySensor)
+	for _, sensor := range p.config.Sensors {
+		hkHumSensors[sensor.MAC] = service.NewHumiditySensor()
+	}
+
+	var hkAccs []*accessory.Accessory
+	for _, a := range hkSensors {
+		fmt.Printf("adding sensor %+v\n", a)
+		a.TempSensor.CurrentTemperature.SetValue(10)
+		hkAccs = append(hkAccs, a.Accessory)
+	}
+	for _, a := range hkHumSensors {
+		fmt.Printf("adding hum sensor %+v\n", a)
+
+	}
+
+	hkConfig := hc.Config{
+		Pin:     p.config.HomeKit.Pin,
+		SetupId: p.config.HomeKit.SetupID,
+		Port:    strconv.Itoa(p.config.HomeKit.Port),
+	}
+	t, err := hc.NewIPTransport(hkConfig, hkBridge.Accessory, hkAccs...)
+	if err != nil {
+		return fmt.Errorf("initializing homekit: %w", err)
+	}
+
+	uri, err := t.XHMURI()
+	if err != nil {
+		return fmt.Errorf("error getting XHM URI: %w", err)
+	}
+	qrterminal.Generate(uri, qrterminal.L, os.Stdout)
+
+	done := make(chan struct{}, 1)
+	hc.OnTermination(func() {
+		<-t.Stop()
+		done <- struct{}{}
+	})
+
+	go t.Start()
+
 Loop:
 	for {
 		select {
@@ -135,6 +200,10 @@ Loop:
 				BatteryVolt: int(sd.BatterymVolt),
 			}
 
+			if hks, ok := hkSensors[addr]; ok {
+				hks.TempSensor.CurrentTemperature.SetValue(float64(sd.Temperature) / 10.0)
+			}
+
 			temperatureMetric.WithLabelValues(name, addr).Set(float64(sd.Temperature) / 10.0)
 			humidityMetric.WithLabelValues(name, addr).Set(float64(sd.Humidity))
 			batteryMetric.WithLabelValues(name, addr).Set(float64(sd.Battery))
@@ -161,6 +230,8 @@ Loop:
 			break Loop
 		}
 	}
+
+	<-done
 
 	return nil
 }
