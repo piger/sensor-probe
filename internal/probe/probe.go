@@ -154,19 +154,14 @@ Loop:
 	for {
 		select {
 		case report := <-reportChan:
-			serviceData := getServiceData(report)
-			if serviceData == nil {
+			sd, addr, found, err := parseReport(report)
+			switch {
+			case err != nil:
+				log.Printf("error: %s", err)
+				continue
+			case !found:
 				continue
 			}
-
-			buf := bytes.NewBuffer(serviceData.Data)
-			var sd sensorData
-			if err := binary.Read(buf, binary.BigEndian, &sd); err != nil {
-				log.Printf("error parsing sensor data from %s: %s", report.Address, err)
-				continue
-			}
-
-			addr := strings.ToUpper(report.Address.String())
 
 			var name string
 			if n, ok := nameMap[addr]; ok {
@@ -253,4 +248,20 @@ func getServiceData(report *host.ScanReport) *hci.AdStructure {
 	}
 
 	return nil
+}
+
+func parseReport(report *host.ScanReport) (*sensorData, string, bool, error) {
+	serviceData := getServiceData(report)
+	if serviceData == nil {
+		return nil, "", false, nil
+	}
+
+	buf := bytes.NewBuffer(serviceData.Data)
+	var sd sensorData
+	if err := binary.Read(buf, binary.BigEndian, &sd); err != nil {
+		return nil, "", false, fmt.Errorf("error parsing sensor data from %s: %w", report.Address, err)
+	}
+
+	addr := strings.ToUpper(report.Address.String())
+	return &sd, addr, true, nil
 }
