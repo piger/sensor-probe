@@ -177,7 +177,7 @@ Loop:
 
 			temperature := float64(sd.Temperature) / 10.0
 
-			fmt.Printf("%q %s: T=%.2f H=%d%% B=%d%%\n", name, addr, temperature, sd.Humidity, sd.Battery)
+			log.Printf("%q (%s): T=%.2f H=%d%% B=%d%%", name, addr, temperature, sd.Humidity, sd.Battery)
 
 			currentValues[name] = SensorStatus{
 				Temperature: temperature,
