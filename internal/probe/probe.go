@@ -15,7 +15,6 @@ import (
 
 	"github.com/brutella/hc"
 	"github.com/brutella/hc/accessory"
-	hcLog "github.com/brutella/hc/log"
 	"github.com/mdp/qrterminal/v3"
 	"github.com/piger/sensor-probe/internal/config"
 	"gitlab.com/jtaimisto/bluewalker/filter"
@@ -116,7 +115,6 @@ func (p *Probe) Run() error {
 	defer ctx.Done()
 
 	// initialise homekit
-	hcLog.Debug.Enable()
 	hkBridge := accessory.NewBridge(accessory.Info{
 		Name:         "Sensor Probe",
 		Manufacturer: "Kertesz Industries",
@@ -129,16 +127,16 @@ func (p *Probe) Run() error {
 	var hkAccs []*accessory.Accessory
 
 	for i, sensor := range p.config.Sensors {
-		log.Printf("adding sensor: %s", sensor.Name)
+		hkID := uint64(i + 2)
+		log.Printf("adding sensor %s with id %d", sensor.Name, hkID)
 
 		hkSensors[sensor.MAC] = accessory.NewTemperatureSensor(accessory.Info{
 			Name:         sensor.Name,
 			Model:        "Xiaomi Thermometer LYWSD03MMC",
 			SerialNumber: "ABCDEFG",
 			Manufacturer: "Xiaomi",
-			ID:           uint64(i + 2),
+			ID:           hkID,
 		}, 0, 0, 50, 1)
-		// 	a.TempSensor.CurrentTemperature.SetValue(10)
 		hkAccs = append(hkAccs, hkSensors[sensor.MAC].Accessory)
 	}
 
