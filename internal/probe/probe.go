@@ -49,6 +49,49 @@ type SensorStatus struct {
 	BatteryVolt int
 }
 
+type Sensor struct {
+	Name      string
+	Address   string
+	Accessory *accessory.Thermometer
+
+	status *SensorStatus
+}
+
+func NewSensor(name, address string, id uint64) *Sensor {
+	info := accessory.Info{
+		Name:         name,
+		Model:        "Xiaomi Thermometer LYWSD03MMC",
+		SerialNumber: "ABCDEFG",
+		Manufacturer: "Xiaomi",
+		ID:           id,
+	}
+	acc := accessory.NewTemperatureSensor(info, 0, 0, 50, 1)
+	s := Sensor{
+		Name:      name,
+		Address:   address,
+		Accessory: acc,
+	}
+
+	return &s
+}
+
+func (s *Sensor) GetStatus() (*SensorStatus, bool) {
+	if s.status != nil {
+		return s.status, true
+	}
+	return nil, false
+}
+
+func (s *Sensor) SetStatus(temperature float64, humidity, battery, batteryVolt int) {
+	status := SensorStatus{
+		Temperature: temperature,
+		Humidity:    humidity,
+		Battery:     battery,
+		BatteryVolt: batteryVolt,
+	}
+	s.status = &status
+}
+
 // New creates a new Probe object; it doesn't initialise the bluetooth device, which must be explicitly
 // initialised by calling p.Initialize().
 func New(device string, config *config.Config) *Probe {
@@ -88,26 +131,12 @@ func (p *Probe) Run() error {
 	}
 	defer p.hostRadio.Deinit()
 
-	doActiveScan := false
-	filters, err := buildFilters(p.config.Sensors)
-	if err != nil {
-		return fmt.Errorf("building filters: %s", err)
-	}
-
-	nameMap := make(map[string]string)
-	for _, sensor := range p.config.Sensors {
-		nameMap[sensor.MAC] = sensor.Name
-	}
+	// Setup internal maps and channels
+	sensorsDB := make(map[string]*Sensor)
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	reportChan, err := p.hostRadio.StartScanning(doActiveScan, filters)
-	if err != nil {
-		return fmt.Errorf("starting scan: %w", err)
-	}
-
-	currentValues := make(map[string]SensorStatus)
 	ticker := time.NewTicker(p.config.Interval.Duration)
 	defer ticker.Stop()
 
@@ -123,21 +152,16 @@ func (p *Probe) Run() error {
 		ID:           1,
 	})
 
-	hkSensors := make(map[string]*accessory.Thermometer)
 	var hkAccs []*accessory.Accessory
 
-	for i, sensor := range p.config.Sensors {
-		hkID := uint64(i + 2)
-		log.Printf("adding sensor %s with id %d", sensor.Name, hkID)
+	// IMPORTANT: sensors must always be added in the same order!
+	for i, sensorConfig := range p.config.Sensors {
+		id := uint64(i + 2)
+		log.Printf("adding sensor %s with ID %d", sensorConfig.Name, id)
 
-		hkSensors[sensor.MAC] = accessory.NewTemperatureSensor(accessory.Info{
-			Name:         sensor.Name,
-			Model:        "Xiaomi Thermometer LYWSD03MMC",
-			SerialNumber: "ABCDEFG",
-			Manufacturer: "Xiaomi",
-			ID:           hkID,
-		}, 0, 0, 50, 1)
-		hkAccs = append(hkAccs, hkSensors[sensor.MAC].Accessory)
+		sensor := NewSensor(sensorConfig.Name, sensorConfig.MAC, id)
+		sensorsDB[sensorConfig.MAC] = sensor
+		hkAccs = append(hkAccs, sensor.Accessory.Accessory)
 	}
 
 	hkConfig := hc.Config{
@@ -150,13 +174,25 @@ func (p *Probe) Run() error {
 		return fmt.Errorf("initializing homekit: %w", err)
 	}
 
+	// Print QR code
 	uri, err := hkTransport.XHMURI()
 	if err != nil {
 		return fmt.Errorf("error getting XHM URI: %w", err)
 	}
 	qrterminal.Generate(uri, qrterminal.L, os.Stdout)
 
+	// Start HomeKit subsystem
 	go hkTransport.Start()
+
+	// Start Bluetooth scan
+	filters, err := buildFilters(p.config.Sensors)
+	if err != nil {
+		return fmt.Errorf("building filters: %s", err)
+	}
+	reportChan, err := p.hostRadio.StartScanning(false, filters)
+	if err != nil {
+		return fmt.Errorf("starting scan: %w", err)
+	}
 
 Loop:
 	for {
@@ -171,41 +207,36 @@ Loop:
 				continue
 			}
 
-			name, ok := nameMap[addr]
+			sensor, ok := sensorsDB[addr]
 			if !ok {
-				log.Printf("MAC address %s not found in nameMap", addr)
+				log.Printf("can't lookup sensor %s internally, this is probably a bug", addr)
 				continue
 			}
 
 			temperature := float64(sd.Temperature) / 10.0
 
-			log.Printf("%q (%s): T=%.2f H=%d%% B=%d%%", name, addr, temperature, sd.Humidity, sd.Battery)
+			log.Printf("%q (%s): T=%.2f H=%d%% B=%d%%", sensor.Name, addr, temperature, sd.Humidity, sd.Battery)
 
 			// Store current values for this sensor
-			currentValues[name] = SensorStatus{
-				Temperature: temperature,
-				Humidity:    int(sd.Humidity),
-				Battery:     int(sd.Battery),
-				BatteryVolt: int(sd.BatterymVolt),
-			}
+			sensor.SetStatus(temperature, int(sd.Humidity), int(sd.Battery), int(sd.BatterymVolt))
 
 			// update temperature in HomeKit
-			if hks, ok := hkSensors[addr]; ok {
-				hks.TempSensor.CurrentTemperature.SetValue(temperature)
-			}
+			sensor.Accessory.TempSensor.CurrentTemperature.SetValue(temperature)
 
 			// update Prometheus metrics
-			temperatureMetric.WithLabelValues(name, addr).Set(temperature)
-			humidityMetric.WithLabelValues(name, addr).Set(float64(sd.Humidity))
-			batteryMetric.WithLabelValues(name, addr).Set(float64(sd.Battery))
+			temperatureMetric.WithLabelValues(sensor.Name, addr).Set(temperature)
+			humidityMetric.WithLabelValues(sensor.Name, addr).Set(float64(sd.Humidity))
+			batteryMetric.WithLabelValues(sensor.Name, addr).Set(float64(sd.Battery))
 
 		case t := <-ticker.C:
 			log.Print("sending current status to DB")
 			now := t.UTC()
 
-			for name, status := range currentValues {
-				if err := writeDBRow(ctx, now, name, status, p.config.DBConfig, "home_temperature"); err != nil {
-					log.Printf("error writing DB row: %s", err)
+			for _, sensor := range sensorsDB {
+				if status, ok := sensor.GetStatus(); ok {
+					if err := writeDBRow(ctx, now, sensor.Name, status, p.config.DBConfig, "home_temperature"); err != nil {
+						log.Printf("error writing DB row: %s", err)
+					}
 				}
 			}
 
@@ -217,7 +248,7 @@ Loop:
 				log.Printf("error stopping scan: %s", err)
 			}
 
-			log.Print("stopping homekit server")
+			log.Print("stopping homekit subsystem")
 			<-hkTransport.Stop()
 
 			break Loop

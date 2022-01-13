@@ -32,7 +32,7 @@ func makeValuesString(names []string) string {
 	return strings.Join(result, ",")
 }
 
-func writeDBRow(ctx context.Context, t time.Time, room string, st SensorStatus, dburl, table string) error {
+func writeDBRow(ctx context.Context, t time.Time, room string, st *SensorStatus, dburl, table string) error {
 	ctx, cancel := context.WithTimeout(ctx, dbConnTimeout)
 	defer cancel()
 
