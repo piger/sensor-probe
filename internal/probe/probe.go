@@ -122,23 +122,24 @@ func (p *Probe) Run() error {
 		Manufacturer: "Kertesz Industries",
 		SerialNumber: "100",
 		Model:        "ABBESTIA",
+		ID:           1,
 	})
 
 	hkSensors := make(map[string]*accessory.Thermometer)
-	for _, sensor := range p.config.Sensors {
+	var hkAccs []*accessory.Accessory
+
+	for i, sensor := range p.config.Sensors {
+		log.Printf("adding sensor: %s", sensor.Name)
+
 		hkSensors[sensor.MAC] = accessory.NewTemperatureSensor(accessory.Info{
 			Name:         sensor.Name,
 			Model:        "Xiaomi Thermometer LYWSD03MMC",
 			SerialNumber: "ABCDEFG",
 			Manufacturer: "Xiaomi",
+			ID:           uint64(i + 2),
 		}, 0, 0, 50, 1)
-	}
-
-	var hkAccs []*accessory.Accessory
-	for _, a := range hkSensors {
-		log.Printf("adding HomeKit sensor: %+v\n", a)
-		a.TempSensor.CurrentTemperature.SetValue(10)
-		hkAccs = append(hkAccs, a.Accessory)
+		// 	a.TempSensor.CurrentTemperature.SetValue(10)
+		hkAccs = append(hkAccs, hkSensors[sensor.MAC].Accessory)
 	}
 
 	hkConfig := hc.Config{
