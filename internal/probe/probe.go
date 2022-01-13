@@ -137,24 +137,18 @@ func (p *Probe) Run() error {
 		SetupId: p.config.HomeKit.SetupID,
 		Port:    strconv.Itoa(p.config.HomeKit.Port),
 	}
-	t, err := hc.NewIPTransport(hkConfig, hkBridge.Accessory, hkAccs...)
+	hkTransport, err := hc.NewIPTransport(hkConfig, hkBridge.Accessory, hkAccs...)
 	if err != nil {
 		return fmt.Errorf("initializing homekit: %w", err)
 	}
 
-	uri, err := t.XHMURI()
+	uri, err := hkTransport.XHMURI()
 	if err != nil {
 		return fmt.Errorf("error getting XHM URI: %w", err)
 	}
 	qrterminal.Generate(uri, qrterminal.L, os.Stdout)
 
-	done := make(chan struct{}, 1)
-	hc.OnTermination(func() {
-		<-t.Stop()
-		done <- struct{}{}
-	})
-
-	go t.Start()
+	go hkTransport.Start()
 
 Loop:
 	for {
@@ -219,11 +213,12 @@ Loop:
 			if err := p.hostRadio.StopScanning(); err != nil {
 				log.Printf("error stopping scan: %s", err)
 			}
+
+			<-hkTransport.Stop()
+
 			break Loop
 		}
 	}
-
-	<-done
 
 	return nil
 }
