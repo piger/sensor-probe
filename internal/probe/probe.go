@@ -157,17 +157,16 @@ Loop:
 			sd, addr, found, err := parseReport(report)
 			switch {
 			case err != nil:
-				log.Printf("error: %s", err)
+				log.Printf("error parsing data from %s: %s", addr, err)
 				continue
 			case !found:
 				continue
 			}
 
-			var name string
-			if n, ok := nameMap[addr]; ok {
-				name = n
-			} else {
-				name = addr
+			name, ok := nameMap[addr]
+			if !ok {
+				log.Printf("MAC address %s not found in nameMap", addr)
+				continue
 			}
 
 			temperature := float64(sd.Temperature) / 10.0
@@ -256,12 +255,13 @@ func parseReport(report *host.ScanReport) (*sensorData, string, bool, error) {
 		return nil, "", false, nil
 	}
 
+	addr := strings.ToUpper(report.Address.String())
+
 	buf := bytes.NewBuffer(serviceData.Data)
 	var sd sensorData
 	if err := binary.Read(buf, binary.BigEndian, &sd); err != nil {
-		return nil, "", false, fmt.Errorf("error parsing sensor data from %s: %w", report.Address, err)
+		return nil, addr, false, err
 	}
 
-	addr := strings.ToUpper(report.Address.String())
 	return &sd, addr, true, nil
 }
