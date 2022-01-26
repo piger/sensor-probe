@@ -295,6 +295,18 @@ func getServiceData(report *host.ScanReport) *hci.AdStructure {
 // and returns a sensorData object, the MAC address of the device, a boolean indicating wether any
 // data was found and an error.
 func parseReport(report *host.ScanReport) (*sensorData, string, bool, error) {
+	for _, rd := range report.Data {
+		if rd.Typ == hci.AdManufacturerSpecific && len(rd.Data) >= 2 && binary.LittleEndian.Uint16(rd.Data) == 0x181a {
+			log.Println("broadcast from xiaomi mijia")
+		} else if rd.Typ == hci.AdManufacturerSpecific && len(rd.Data) >= 2 && binary.LittleEndian.Uint16(rd.Data) == 0x0499 {
+			// https://github.com/ruuvi/ruuvi-sensor-protocols/blob/master/dataformat_05.md
+			log.Println("broadcast from ruuvi")
+
+			// exit early because our parser isn't ready!
+			return nil, "", false, nil
+		}
+	}
+
 	serviceData := getServiceData(report)
 	if serviceData == nil {
 		return nil, "", false, nil
