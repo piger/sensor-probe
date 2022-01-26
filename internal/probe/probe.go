@@ -272,6 +272,8 @@ func buildFilters(sensors []config.SensorConfig) ([]filter.AdFilter, error) {
 
 	filters := []filter.AdFilter{
 		filter.Any(addrFilters),
+		// should we try to filter by this too?
+		// filter.ByAdType(hci.AdServiceData),
 	}
 
 	return filters, nil
