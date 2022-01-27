@@ -17,6 +17,8 @@ import (
 	"github.com/brutella/hc/accessory"
 	"github.com/mdp/qrterminal/v3"
 	"github.com/piger/sensor-probe/internal/config"
+	"github.com/piger/sensor-probe/internal/sensors/mijia"
+	"github.com/piger/sensor-probe/internal/sensors/ruuvi"
 	"gitlab.com/jtaimisto/bluewalker/filter"
 	"gitlab.com/jtaimisto/bluewalker/hci"
 	"gitlab.com/jtaimisto/bluewalker/host"
@@ -267,13 +269,22 @@ func buildFilters(sensors []config.SensorConfig) ([]filter.AdFilter, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parsing MAC address %q: %w", sensor.MAC, err)
 		}
+
+		// hack to support BT random addresses
+		if sensor.Firmware == "ruuviv5" {
+			baddr.Atype = hci.LeRandomAddress
+		}
 		addrFilters[i] = filter.ByAddress(baddr)
 	}
 
 	filters := []filter.AdFilter{
 		filter.Any(addrFilters),
-		// should we try to filter by this too?
-		// filter.ByAdType(hci.AdServiceData),
+		/*
+			filter.Any([]filter.AdFilter{
+				filter.ByVendor([]byte{0x99, 0x04}),
+				filter.ByAdData(hci.AdServiceData, []byte{0x1a, 0x18}),
+			}),
+		*/
 	}
 
 	return filters, nil
@@ -296,11 +307,25 @@ func getServiceData(report *host.ScanReport) *hci.AdStructure {
 // data was found and an error.
 func parseReport(report *host.ScanReport) (*sensorData, string, bool, error) {
 	for _, rd := range report.Data {
-		if rd.Typ == hci.AdManufacturerSpecific && len(rd.Data) >= 2 && binary.LittleEndian.Uint16(rd.Data) == 0x181a {
+		if rd.Typ == hci.AdServiceData && len(rd.Data) >= 2 && binary.LittleEndian.Uint16(rd.Data) == 0x181a {
 			log.Println("broadcast from xiaomi mijia")
+
+			data, err := mijia.ParseMessage(rd)
+			if err != nil {
+				log.Printf("parse mijia err: %s", err)
+			} else {
+				log.Printf("mijia data: %+v", data)
+			}
 		} else if rd.Typ == hci.AdManufacturerSpecific && len(rd.Data) >= 2 && binary.LittleEndian.Uint16(rd.Data) == 0x0499 {
 			// https://github.com/ruuvi/ruuvi-sensor-protocols/blob/master/dataformat_05.md
 			log.Println("broadcast from ruuvi")
+
+			data, err := ruuvi.ParseMessage(rd)
+			if err != nil {
+				log.Printf("parse ruuvi err: %s", err)
+			} else {
+				log.Printf("ruuvi data: %+v", data)
+			}
 
 			// exit early because our parser isn't ready!
 			return nil, "", false, nil
