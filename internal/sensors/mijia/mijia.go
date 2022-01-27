@@ -35,10 +35,10 @@ func ParseMessage(ads *hci.AdStructure) (*Data, error) {
 	}
 
 	data := Data{
-		Temperature: float32(p.Temperature) / 100,
-		Humidity:    float32(p.Humidity) / 100,
+		Temperature: float32(p.Temperature) / 10.0,
+		Humidity:    float32(p.Humidity),
 		Battery:     uint16(p.Battery),
-		BatteryVolt: float32(p.BatterymVolt) / 1000,
+		BatteryVolt: float32(p.BatterymVolt),
 	}
 	return &data, nil
 }
