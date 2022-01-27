@@ -225,11 +225,6 @@ Loop:
 			// update temperature in HomeKit
 			sensor.Accessory.TempSensor.CurrentTemperature.SetValue(temperature)
 
-			// update Prometheus metrics
-			temperatureMetric.WithLabelValues(sensor.Name, addr).Set(temperature)
-			humidityMetric.WithLabelValues(sensor.Name, addr).Set(float64(sd.Humidity))
-			batteryMetric.WithLabelValues(sensor.Name, addr).Set(float64(sd.Battery))
-
 		case t := <-ticker.C:
 			log.Print("sending current status to DB")
 			now := t.UTC()
