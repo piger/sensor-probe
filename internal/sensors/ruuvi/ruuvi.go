@@ -78,3 +78,9 @@ func ParseMessage(ads *hci.AdStructure) (*Data, error) {
 
 	return &data, nil
 }
+
+const UUID = 0x0499
+
+func CheckReport(r *hci.AdStructure) bool {
+	return r.Typ == hci.AdManufacturerSpecific && len(r.Data) >= 2 && binary.LittleEndian.Uint16(r.Data) == UUID
+}
