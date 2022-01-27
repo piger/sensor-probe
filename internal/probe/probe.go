@@ -157,7 +157,7 @@ func (p *Probe) Run() error {
 	// IMPORTANT: sensors must always be added in the same order!
 	for i, sensorConfig := range p.config.Sensors {
 		id := uint64(i + 2)
-		log.Printf("adding sensor %s with ID %d", sensorConfig.Name, id)
+		log.Printf("adding sensor %s (%s) with ID %d", sensorConfig.Name, sensorConfig.MAC, id)
 
 		sensor := NewSensor(sensorConfig.Name, sensorConfig.MAC, id)
 		sensorsDB[sensorConfig.MAC] = sensor
