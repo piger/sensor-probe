@@ -21,10 +21,10 @@ type payload struct {
 }
 
 type Data struct {
-	Temperature float64
-	Humidity    int
-	Battery     int
-	BatteryVolt int
+	Temperature float32
+	Humidity    float32
+	Battery     uint16
+	BatteryVolt float32
 }
 
 func ParseMessage(ads *hci.AdStructure) (*Data, error) {
@@ -35,10 +35,10 @@ func ParseMessage(ads *hci.AdStructure) (*Data, error) {
 	}
 
 	data := Data{
-		Temperature: float64(p.Temperature) / 10.0,
-		Humidity:    int(p.Humidity),
-		Battery:     int(p.Battery),
-		BatteryVolt: int(p.BatterymVolt),
+		Temperature: float32(p.Temperature) / 100,
+		Humidity:    float32(p.Humidity) / 100,
+		Battery:     uint16(p.Battery),
+		BatteryVolt: float32(p.BatterymVolt) / 1000,
 	}
 	return &data, nil
 }

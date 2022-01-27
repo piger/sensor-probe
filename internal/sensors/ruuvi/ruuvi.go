@@ -62,6 +62,7 @@ func ParseMessage(ads *hci.AdStructure) (*Data, error) {
 	txpower := -40 + int((tmp * 2))
 
 	// v5 format
+	// XXX need to compare Voltage and TxPower with bluewalker, to see if I'm parsing correctly
 	data := Data{
 		Temperature:   float32(p.Temperature) * 0.005,
 		Humidity:      float32(p.Humidity) * 0.0025,
