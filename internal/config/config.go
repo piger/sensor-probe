@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -26,9 +27,10 @@ type HomeKit struct {
 
 // SensorConfig contains the configuration of a single sensor.
 type SensorConfig struct {
-	Name     string
-	MAC      string
-	Firmware string
+	Name     string `toml:"name"`
+	MAC      string `toml:"mac"`
+	Firmware string `toml:"firmware"`
+	DBTable  string `toml:"dbtable"`
 }
 
 type duration struct {
@@ -58,7 +60,26 @@ func ReadConfig(filename string) (*Config, error) {
 		return nil, fmt.Errorf("parsing configuration file %q: %w", filename, err)
 	}
 
+	if config.HomeKit.Pin == "" {
+		return nil, errors.New("missing pin in homekit")
+	}
+	if config.HomeKit.Port == 0 {
+		return nil, errors.New("missing port in homekit")
+	}
+	if config.HomeKit.SetupID == "" {
+		return nil, errors.New("missing SetupID in homekit")
+	}
+
 	for i, sensor := range config.Sensors {
+		if sensor.Name == "" {
+			return nil, fmt.Errorf("missing name for sensor %d", i)
+		}
+		if sensor.MAC == "" {
+			return nil, fmt.Errorf("missing MAC for sensor %d", i)
+		}
+		if sensor.DBTable == "" {
+			return nil, fmt.Errorf("missing DBTable for sensor %d", i)
+		}
 		config.Sensors[i].MAC = strings.ToUpper(sensor.MAC)
 	}
 
