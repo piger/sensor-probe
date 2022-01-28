@@ -4,16 +4,18 @@ import "time"
 
 type Sensor struct {
 	Name              string
-	Address           string
+	MAC               string
+	DBTable           string
 	Accessory         *TemperatureHumiditySensor
 	LastUpdateHomeKit time.Time
 	LastUpdateDB      time.Time
 }
 
-func NewSensor(name, address string, id uint64) *Sensor {
+func NewSensor(name, address, table string, id uint64) *Sensor {
 	s := Sensor{
 		Name:      name,
-		Address:   address,
+		MAC:       address,
+		DBTable:   table,
 		Accessory: NewMijiaSensor(name, id),
 	}
 

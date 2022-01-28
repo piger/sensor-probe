@@ -69,7 +69,7 @@ func (p *Probe) Run() error {
 		id := uint64(i + 2)
 		log.Printf("adding sensor %s (%s) with ID %d", sensorConfig.Name, sensorConfig.MAC, id)
 
-		sensor := NewSensor(sensorConfig.Name, sensorConfig.MAC, id)
+		sensor := NewSensor(sensorConfig.Name, sensorConfig.MAC, sensorConfig.DBTable, id)
 		sensorsDB[sensorConfig.MAC] = sensor
 		hkAccs = append(hkAccs, sensor.Accessory.Accessory)
 	}
@@ -131,7 +131,7 @@ Loop:
 
 			if sensor.LastUpdateDB.IsZero() || now.Sub(sensor.LastUpdateDB) >= updateDelayDB {
 				log.Printf("Updating DB for %s", addr)
-				if err := writeDBRow(ctx, now, sensor.Name, data, p.config.DBConfig, "home_temperature"); err != nil {
+				if err := writeDBRow(ctx, now, sensor.Name, data, p.config.DBConfig, sensor.DBTable); err != nil {
 					log.Printf("error writing DB row: %s", err)
 				}
 				sensor.LastUpdateDB = now
