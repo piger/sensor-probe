@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4"
+	"github.com/piger/sensor-probe/internal/sensors/mijia"
 )
 
 var columnNames = []string{
@@ -32,7 +33,7 @@ func makeValuesString(names []string) string {
 	return strings.Join(result, ",")
 }
 
-func writeDBRow(ctx context.Context, t time.Time, room string, st *SensorStatus, dburl, table string) error {
+func writeDBRow(ctx context.Context, t time.Time, room string, data *mijia.Data, dburl, table string) error {
 	ctx, cancel := context.WithTimeout(ctx, dbConnTimeout)
 	defer cancel()
 
@@ -49,9 +50,9 @@ func writeDBRow(ctx context.Context, t time.Time, room string, st *SensorStatus,
 		fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s)", table, columns, values),
 		t,
 		room,
-		st.Temperature,
-		st.Humidity,
-		st.Battery,
+		data.Temperature,
+		data.Humidity,
+		data.Battery,
 	); err != nil {
 		return fmt.Errorf("error writing row to DB: %w", err)
 	}

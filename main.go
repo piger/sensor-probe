@@ -24,9 +24,6 @@ func main() {
 	}
 
 	probe := probe.New(*device, cfg)
-	if err := probe.Initialize(); err != nil {
-		log.Fatalf("initializing probe: %s -- remember to run: sudo hciconfig hci0 down", err)
-	}
 
 	if *debugHk {
 		hcLog.Debug.Enable()
