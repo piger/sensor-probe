@@ -123,10 +123,10 @@ func NewRuuviSensor(config *config.SensorConfig, id uint64) *RuuviSensor {
 	return &RuuviSensor{s}
 }
 
-func (rv *RuuviSensor) Update(report *host.ScanReport, dbconfig string) error {
+func (rv *RuuviSensor) Update(ctx context.Context, report *host.ScanReport, dbconfig string) error {
 	for _, ads := range report.Data {
 		if checkReport(ads) {
-			if err := rv.handleBroadcast(ads, dbconfig); err != nil {
+			if err := rv.handleBroadcast(ctx, ads, dbconfig); err != nil {
 				log.Print(err)
 			}
 		}
@@ -134,7 +134,7 @@ func (rv *RuuviSensor) Update(report *host.ScanReport, dbconfig string) error {
 	return nil
 }
 
-func (rv *RuuviSensor) handleBroadcast(b *hci.AdStructure, dbconfig string) error {
+func (rv *RuuviSensor) handleBroadcast(ctx context.Context, b *hci.AdStructure, dbconfig string) error {
 	data, err := parseMessage(b)
 	if err != nil {
 		return err
@@ -149,7 +149,6 @@ func (rv *RuuviSensor) handleBroadcast(b *hci.AdStructure, dbconfig string) erro
 		rv.LastUpdateHomeKit = now
 	}
 
-	ctx := context.TODO()
 	if rv.LastUpdateDB.IsZero() || now.Sub(rv.LastUpdateDB) >= sensors.UpdateDelayDB {
 		if err := writeDBRow(ctx, now, data, dbconfig, rv.DBTable); err != nil {
 			return err

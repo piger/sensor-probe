@@ -1,6 +1,7 @@
 package sensors
 
 import (
+	"context"
 	"time"
 
 	"github.com/piger/sensor-probe/internal/config"
@@ -48,6 +49,6 @@ func (s *Sensor) GetAccessory() *homekit.TemperatureHumiditySensor {
 
 type SensorUpdater interface {
 	// data and DB config
-	Update(*host.ScanReport, string) error
+	Update(context.Context, *host.ScanReport, string) error
 	GetAccessory() *homekit.TemperatureHumiditySensor
 }

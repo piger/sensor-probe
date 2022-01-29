@@ -107,7 +107,7 @@ func (p *Probe) Run() error {
 		case report := <-reportChan:
 			addr := strings.ToUpper(report.Address.String())
 			if sensor, ok := sensorsDB[addr]; ok {
-				if err := sensor.Update(report, p.config.DBConfig); err != nil {
+				if err := sensor.Update(ctx, report, p.config.DBConfig); err != nil {
 					log.Print(err)
 				}
 			} else {

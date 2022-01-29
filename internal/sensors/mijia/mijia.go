@@ -79,10 +79,10 @@ func NewMijiaSensor(config *config.SensorConfig, id uint64) *MijiaSensor {
 	return &MijiaSensor{s}
 }
 
-func (m *MijiaSensor) Update(report *host.ScanReport, dbconfig string) error {
+func (m *MijiaSensor) Update(ctx context.Context, report *host.ScanReport, dbconfig string) error {
 	for _, ads := range report.Data {
 		if checkReport(ads) {
-			if err := m.handleBroadcast(ads, dbconfig); err != nil {
+			if err := m.handleBroadcast(ctx, ads, dbconfig); err != nil {
 				log.Print(err)
 			}
 		}
@@ -90,7 +90,7 @@ func (m *MijiaSensor) Update(report *host.ScanReport, dbconfig string) error {
 	return nil
 }
 
-func (m *MijiaSensor) handleBroadcast(b *hci.AdStructure, dbconfig string) error {
+func (m *MijiaSensor) handleBroadcast(ctx context.Context, b *hci.AdStructure, dbconfig string) error {
 	data, err := parseMessage(b)
 	if err != nil {
 		return err
@@ -105,7 +105,6 @@ func (m *MijiaSensor) handleBroadcast(b *hci.AdStructure, dbconfig string) error
 		m.LastUpdateHomeKit = now
 	}
 
-	ctx := context.TODO()
 	if m.LastUpdateDB.IsZero() || now.Sub(m.LastUpdateDB) >= sensors.UpdateDelayDB {
 		if err := writeDBRow(ctx, now, m.Name, data, dbconfig, m.DBTable); err != nil {
 			return err
