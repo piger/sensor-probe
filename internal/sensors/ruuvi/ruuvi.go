@@ -5,10 +5,20 @@ package ruuvi
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
+	"log"
+	"time"
 
+	"github.com/brutella/hc/accessory"
+	"github.com/jackc/pgx/v4"
+	"github.com/piger/sensor-probe/internal/config"
+	"github.com/piger/sensor-probe/internal/db"
+	"github.com/piger/sensor-probe/internal/homekit"
+	"github.com/piger/sensor-probe/internal/sensors"
 	"gitlab.com/jtaimisto/bluewalker/hci"
+	"gitlab.com/jtaimisto/bluewalker/host"
 )
 
 // v5 format
@@ -40,10 +50,19 @@ type Data struct {
 	Seq           int
 }
 
+var columnNames = []string{
+	"time",
+	"temperature",
+	"humidity",
+	"pressure",
+	"voltage",
+	"txpower",
+}
+
 // TODO is the data prefixed by the manufacturer ID?? 0x0499 (2 bytes)
 // and if so should we skip it? how does the mijia parser handle it??
 
-func ParseMessage(ads *hci.AdStructure) (*Data, error) {
+func parseMessage(ads *hci.AdStructure) (*Data, error) {
 	var p payload
 	buf := bytes.NewBuffer(ads.Data)
 	if err := binary.Read(buf, binary.BigEndian, &p); err != nil {
@@ -81,6 +100,89 @@ func ParseMessage(ads *hci.AdStructure) (*Data, error) {
 
 const UUID = 0x0499
 
-func CheckReport(r *hci.AdStructure) bool {
+func checkReport(r *hci.AdStructure) bool {
 	return r.Typ == hci.AdManufacturerSpecific && len(r.Data) >= 2 && binary.LittleEndian.Uint16(r.Data) == UUID
+}
+
+type RuuviSensor struct {
+	*sensors.Sensor
+}
+
+func NewRuuviSensor(config *config.SensorConfig, id uint64) *RuuviSensor {
+	info := accessory.Info{
+		Name:         config.Name,
+		Model:        "",
+		SerialNumber: "",
+		Manufacturer: "",
+		ID:           id,
+	}
+
+	acc := homekit.NewTemperatureHumiditySensor(info)
+	s := sensors.NewSensor(config, acc)
+
+	return &RuuviSensor{s}
+}
+
+func (rv *RuuviSensor) Update(report *host.ScanReport, dbconfig string) error {
+	for _, ads := range report.Data {
+		if checkReport(ads) {
+			if err := rv.handleBroadcast(ads, dbconfig); err != nil {
+				log.Print(err)
+			}
+		}
+	}
+	return nil
+}
+
+func (rv *RuuviSensor) handleBroadcast(b *hci.AdStructure, dbconfig string) error {
+	data, err := parseMessage(b)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	log.Printf("%q (%s): T=%.2f H=%.2f%% P=%d B=%d%%", rv.Name, rv.MAC, data.Temperature, data.Humidity, data.Pressure, data.TxPower)
+
+	if rv.LastUpdateHomeKit.IsZero() || now.Sub(rv.LastUpdateHomeKit) >= sensors.UpdateDelayHk {
+		rv.SetTemperature(float64(data.Temperature))
+		rv.SetHumidity(float64(data.Humidity))
+		rv.LastUpdateHomeKit = now
+	}
+
+	ctx := context.TODO()
+	if rv.LastUpdateDB.IsZero() || now.Sub(rv.LastUpdateDB) >= sensors.UpdateDelayDB {
+		if err := writeDBRow(ctx, now, data, dbconfig, rv.DBTable); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func writeDBRow(ctx context.Context, t time.Time, data *Data, dburl, table string) error {
+	ctx, cancel := context.WithTimeout(ctx, db.DBConnTimeout)
+	defer cancel()
+
+	conn, err := pgx.Connect(ctx, dburl)
+	if err != nil {
+		return fmt.Errorf("error connecting to DB: %w", err)
+	}
+	defer conn.Close(ctx)
+
+	columns := db.MakeColumnString(columnNames)
+	values := db.MakeValuesString(columnNames)
+
+	if _, err := conn.Exec(ctx,
+		fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s)", table, columns, values),
+		t,
+		data.Temperature,
+		data.Humidity,
+		data.Pressure,
+		data.Voltage,
+		data.TxPower,
+	); err != nil {
+		return fmt.Errorf("error writing row to DB: %w", err)
+	}
+
+	return nil
 }

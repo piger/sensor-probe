@@ -1,9 +1,9 @@
-package probe
+package homekit
 
 import (
 	"fmt"
+	"io"
 	"log"
-	"os"
 	"strconv"
 
 	"github.com/brutella/hc"
@@ -44,28 +44,7 @@ func NewTemperatureHumiditySensor(info accessory.Info) *TemperatureHumiditySenso
 	return &acc
 }
 
-func NewMijiaSensor(name string, id uint64) *TemperatureHumiditySensor {
-	info := accessory.Info{
-		Name:         name,
-		Model:        "Xiaomi Thermometer LYWSD03MMC",
-		SerialNumber: "ABCDEFG",
-		Manufacturer: "Xiaomi",
-		ID:           id,
-	}
-
-	s := NewTemperatureHumiditySensor(info)
-	return s
-}
-
-func (s *TemperatureHumiditySensor) SetTemperature(v float64) {
-	s.TemperatureSensor.CurrentTemperature.SetValue(v)
-}
-
-func (s *TemperatureHumiditySensor) SetHumidity(v float64) {
-	s.HumiditySensor.CurrentRelativeHumidity.SetValue(v)
-}
-
-func setupHomeKit(config *config.HomeKit, accs []*accessory.Accessory) (HomeKitTransport, error) {
+func SetupHomeKit(config *config.HomeKit, accs []*accessory.Accessory) (HomeKitTransport, error) {
 	hkBridge := accessory.NewBridge(accessory.Info{
 		Name:         "Sensor Probe",
 		Manufacturer: "Kertesz Industries",
@@ -87,11 +66,11 @@ func setupHomeKit(config *config.HomeKit, accs []*accessory.Accessory) (HomeKitT
 	return hkTransport, nil
 }
 
-func printQRcode(t HomeKitTransport) {
+func PrintQRcode(t HomeKitTransport, w io.Writer) {
 	uri, err := t.XHMURI()
 	if err != nil {
 		log.Printf("error getting XHM URI: %s", err)
 		return
 	}
-	qrterminal.Generate(uri, qrterminal.L, os.Stdout)
+	qrterminal.Generate(uri, qrterminal.L, w)
 }
