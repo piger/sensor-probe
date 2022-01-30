@@ -153,6 +153,7 @@ func (rv *RuuviSensor) handleBroadcast(ctx context.Context, b *hci.AdStructure, 
 		if err := writeDBRow(ctx, now, data, dbconfig, rv.DBTable); err != nil {
 			return err
 		}
+		rv.LastUpdateDB = now
 	}
 
 	return nil
