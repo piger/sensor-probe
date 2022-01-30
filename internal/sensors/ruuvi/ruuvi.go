@@ -141,7 +141,7 @@ func (rv *RuuviSensor) handleBroadcast(ctx context.Context, b *hci.AdStructure, 
 	}
 
 	now := time.Now()
-	log.Printf("%q (%s): T=%.2f H=%.2f%% P=%d B=%d%%", rv.Name, rv.MAC, data.Temperature, data.Humidity, data.Pressure, data.TxPower)
+	log.Printf("%q (%s): T=%.2f H=%.2f%% P=%d Tx=%ddBm V=%dV", rv.Name, rv.MAC, data.Temperature, data.Humidity, data.Pressure, data.TxPower, data.Voltage)
 
 	if rv.LastUpdateHomeKit.IsZero() || now.Sub(rv.LastUpdateHomeKit) >= sensors.UpdateDelayHk {
 		rv.SetTemperature(float64(data.Temperature))
