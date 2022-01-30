@@ -111,9 +111,9 @@ type RuuviSensor struct {
 func NewRuuviSensor(config *config.SensorConfig, id uint64) *RuuviSensor {
 	info := accessory.Info{
 		Name:         config.Name,
-		Model:        "",
-		SerialNumber: "",
-		Manufacturer: "",
+		Model:        "RuuviTag 4in1",
+		SerialNumber: "12345",
+		Manufacturer: "Ruuvi",
 		ID:           id,
 	}
 
