@@ -109,6 +109,7 @@ func (m *MijiaSensor) handleBroadcast(ctx context.Context, b *hci.AdStructure, d
 		if err := writeDBRow(ctx, now, m.Name, data, dbconfig, m.DBTable); err != nil {
 			return err
 		}
+		m.LastUpdateDB = now
 	}
 
 	return nil
