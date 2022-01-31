@@ -7,12 +7,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/brutella/hc/accessory"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/piger/sensor-probe/internal/config"
 	"github.com/piger/sensor-probe/internal/db"
 	"github.com/piger/sensor-probe/internal/homekit"
@@ -62,6 +63,7 @@ func checkReport(r *hci.AdStructure) bool {
 
 type MijiaSensor struct {
 	*sensors.Sensor
+	LastData *Data
 }
 
 func NewMijiaSensor(config *config.SensorConfig, id uint64) *MijiaSensor {
@@ -76,13 +78,21 @@ func NewMijiaSensor(config *config.SensorConfig, id uint64) *MijiaSensor {
 	acc := homekit.NewTemperatureHumiditySensor(info)
 	s := sensors.NewSensor(config, acc)
 
-	return &MijiaSensor{s}
+	ms := MijiaSensor{
+		Sensor:   s,
+		LastData: nil,
+	}
+	return &ms
 }
 
-func (m *MijiaSensor) Update(ctx context.Context, report *host.ScanReport, dbconfig string) error {
+func (m *MijiaSensor) GetName() string {
+	return m.Name
+}
+
+func (m *MijiaSensor) Update(report *host.ScanReport) error {
 	for _, ads := range report.Data {
 		if checkReport(ads) {
-			if err := m.handleBroadcast(ctx, ads, dbconfig); err != nil {
+			if err := m.handleBroadcast(ads); err != nil {
 				log.Print(err)
 			}
 		}
@@ -90,26 +100,20 @@ func (m *MijiaSensor) Update(ctx context.Context, report *host.ScanReport, dbcon
 	return nil
 }
 
-func (m *MijiaSensor) handleBroadcast(ctx context.Context, b *hci.AdStructure, dbconfig string) error {
+func (m *MijiaSensor) handleBroadcast(b *hci.AdStructure) error {
 	data, err := parseMessage(b)
 	if err != nil {
 		return err
 	}
+	m.LastData = data
 
 	now := time.Now()
-	log.Printf("%q (%s): T=%.2f H=%.2f%% B=%d%%", m.Name, m.MAC, data.Temperature, data.Humidity, data.Battery)
+	// log.Printf("%q (%s): T=%.2f H=%.2f%% B=%d%%", m.Name, m.MAC, data.Temperature, data.Humidity, data.Battery)
 
 	if m.LastUpdateHomeKit.IsZero() || now.Sub(m.LastUpdateHomeKit) >= sensors.UpdateDelayHk {
 		m.SetTemperature(float64(data.Temperature))
 		m.SetHumidity(float64(data.Humidity))
 		m.LastUpdateHomeKit = now
-	}
-
-	if m.LastUpdateDB.IsZero() || now.Sub(m.LastUpdateDB) >= sensors.UpdateDelayDB {
-		if err := writeDBRow(ctx, now, m.Name, data, dbconfig, m.DBTable); err != nil {
-			return err
-		}
-		m.LastUpdateDB = now
 	}
 
 	return nil
@@ -123,26 +127,24 @@ var columnNames = []string{
 	"battery",
 }
 
-func writeDBRow(ctx context.Context, t time.Time, room string, data *Data, dburl, table string) error {
+func (m *MijiaSensor) Push(ctx context.Context, pool *pgxpool.Pool, t time.Time) error {
+	if m.LastData == nil {
+		return errors.New("no last data")
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, db.DBConnTimeout)
 	defer cancel()
-
-	conn, err := pgx.Connect(ctx, dburl)
-	if err != nil {
-		return fmt.Errorf("error connecting to DB: %w", err)
-	}
-	defer conn.Close(ctx)
 
 	columns := db.MakeColumnString(columnNames)
 	values := db.MakeValuesString(columnNames)
 
-	if _, err := conn.Exec(ctx,
-		fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s)", table, columns, values),
+	if _, err := pool.Exec(ctx,
+		fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s)", m.DBTable, columns, values),
 		t,
-		room,
-		data.Temperature,
-		data.Humidity,
-		data.Battery,
+		m.Name,
+		m.LastData.Temperature,
+		m.LastData.Humidity,
+		m.LastData.Battery,
 	); err != nil {
 		return fmt.Errorf("error writing row to DB: %w", err)
 	}

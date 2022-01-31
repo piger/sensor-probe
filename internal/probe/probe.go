@@ -8,8 +8,10 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/brutella/hc/accessory"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/piger/sensor-probe/internal/config"
 	"github.com/piger/sensor-probe/internal/homekit"
 	"github.com/piger/sensor-probe/internal/sensors"
@@ -58,6 +60,12 @@ func (p *Probe) Run() error {
 	ctx := context.Background()
 	defer ctx.Done()
 
+	pool, err := pgxpool.Connect(ctx, p.config.DBConfig)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
 	sensorsDB := make(map[string]sensors.SensorUpdater)
 	var hkAccs []*accessory.Accessory
 
@@ -102,16 +110,26 @@ func (p *Probe) Run() error {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
+	tick := time.NewTicker(sensors.UpdateDelayDB)
+	defer tick.Stop()
+
 	for {
 		select {
 		case report := <-reportChan:
 			addr := strings.ToUpper(report.Address.String())
 			if sensor, ok := sensorsDB[addr]; ok {
-				if err := sensor.Update(ctx, report, p.config.DBConfig); err != nil {
+				if err := sensor.Update(report); err != nil {
 					log.Print(err)
 				}
 			} else {
 				log.Printf("can't lookup sensor %s internally, this is probably a bug", addr)
+			}
+
+		case ts := <-tick.C:
+			for _, sensor := range sensorsDB {
+				if err := sensor.Push(ctx, pool, ts); err != nil {
+					log.Printf("error sending metrics from %s: %s", sensor.GetName(), err)
+				}
 			}
 
 		case sig := <-sigs:

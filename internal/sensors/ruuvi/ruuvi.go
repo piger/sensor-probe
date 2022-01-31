@@ -7,12 +7,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/brutella/hc/accessory"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/piger/sensor-probe/internal/config"
 	"github.com/piger/sensor-probe/internal/db"
 	"github.com/piger/sensor-probe/internal/homekit"
@@ -106,6 +107,7 @@ func checkReport(r *hci.AdStructure) bool {
 
 type RuuviSensor struct {
 	*sensors.Sensor
+	LastData *Data
 }
 
 func NewRuuviSensor(config *config.SensorConfig, id uint64) *RuuviSensor {
@@ -119,14 +121,21 @@ func NewRuuviSensor(config *config.SensorConfig, id uint64) *RuuviSensor {
 
 	acc := homekit.NewTemperatureHumiditySensor(info)
 	s := sensors.NewSensor(config, acc)
-
-	return &RuuviSensor{s}
+	rv := RuuviSensor{
+		Sensor:   s,
+		LastData: nil,
+	}
+	return &rv
 }
 
-func (rv *RuuviSensor) Update(ctx context.Context, report *host.ScanReport, dbconfig string) error {
+func (rv *RuuviSensor) GetName() string {
+	return rv.Name
+}
+
+func (rv *RuuviSensor) Update(report *host.ScanReport) error {
 	for _, ads := range report.Data {
 		if checkReport(ads) {
-			if err := rv.handleBroadcast(ctx, ads, dbconfig); err != nil {
+			if err := rv.handleBroadcast(ads); err != nil {
 				log.Print(err)
 			}
 		}
@@ -134,14 +143,15 @@ func (rv *RuuviSensor) Update(ctx context.Context, report *host.ScanReport, dbco
 	return nil
 }
 
-func (rv *RuuviSensor) handleBroadcast(ctx context.Context, b *hci.AdStructure, dbconfig string) error {
+func (rv *RuuviSensor) handleBroadcast(b *hci.AdStructure) error {
 	data, err := parseMessage(b)
 	if err != nil {
 		return err
 	}
+	rv.LastData = data
 
 	now := time.Now()
-	log.Printf("%q (%s): T=%.2f H=%.2f%% P=%d Tx=%ddBm V=%dV", rv.Name, rv.MAC, data.Temperature, data.Humidity, data.Pressure, data.TxPower, data.Voltage)
+	// log.Printf("%q (%s): T=%.2f H=%.2f%% P=%d Tx=%ddBm V=%dV", rv.Name, rv.MAC, data.Temperature, data.Humidity, data.Pressure, data.TxPower, data.Voltage)
 
 	if rv.LastUpdateHomeKit.IsZero() || now.Sub(rv.LastUpdateHomeKit) >= sensors.UpdateDelayHk {
 		rv.SetTemperature(float64(data.Temperature))
@@ -149,37 +159,28 @@ func (rv *RuuviSensor) handleBroadcast(ctx context.Context, b *hci.AdStructure, 
 		rv.LastUpdateHomeKit = now
 	}
 
-	if rv.LastUpdateDB.IsZero() || now.Sub(rv.LastUpdateDB) >= sensors.UpdateDelayDB {
-		if err := writeDBRow(ctx, now, data, dbconfig, rv.DBTable); err != nil {
-			return err
-		}
-		rv.LastUpdateDB = now
-	}
-
 	return nil
 }
 
-func writeDBRow(ctx context.Context, t time.Time, data *Data, dburl, table string) error {
+func (rv *RuuviSensor) Push(ctx context.Context, pool *pgxpool.Pool, t time.Time) error {
+	if rv.LastData == nil {
+		return errors.New("no last data")
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, db.DBConnTimeout)
 	defer cancel()
-
-	conn, err := pgx.Connect(ctx, dburl)
-	if err != nil {
-		return fmt.Errorf("error connecting to DB: %w", err)
-	}
-	defer conn.Close(ctx)
 
 	columns := db.MakeColumnString(columnNames)
 	values := db.MakeValuesString(columnNames)
 
-	if _, err := conn.Exec(ctx,
-		fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s)", table, columns, values),
+	if _, err := pool.Exec(ctx,
+		fmt.Sprintf("INSERT INTO %s(%s) VALUES(%s)", rv.DBTable, columns, values),
 		t,
-		data.Temperature,
-		data.Humidity,
-		data.Pressure,
-		data.Voltage,
-		data.TxPower,
+		rv.LastData.Temperature,
+		rv.LastData.Humidity,
+		rv.LastData.Pressure,
+		rv.LastData.Voltage,
+		rv.LastData.TxPower,
 	); err != nil {
 		return fmt.Errorf("error writing row to DB: %w", err)
 	}

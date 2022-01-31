@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/piger/sensor-probe/internal/config"
 	"github.com/piger/sensor-probe/internal/homekit"
 	"gitlab.com/jtaimisto/bluewalker/host"
@@ -48,7 +49,15 @@ func (s *Sensor) GetAccessory() *homekit.TemperatureHumiditySensor {
 }
 
 type SensorUpdater interface {
-	// data and DB config
-	Update(context.Context, *host.ScanReport, string) error
+	// GetName returns the name of a Sensor; it's used to name the sensor in error messages.
+	GetName() string
+
+	// Update search for sensor data in a bluetooth broadcast, set them in HomeKit and store the data.
+	Update(*host.ScanReport) error
+
+	// Push push the latest set of sensor data to the metrics server.
+	Push(context.Context, *pgxpool.Pool, time.Time) error
+
+	// GetAccessory returns the embedded HomeKit accessory.
 	GetAccessory() *homekit.TemperatureHumiditySensor
 }
