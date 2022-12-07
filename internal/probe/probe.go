@@ -57,8 +57,7 @@ func (p *Probe) Run() error {
 	}
 	defer hostRadio.Deinit()
 
-	ctx := context.Background()
-	defer ctx.Done()
+	ctx, stopCtx := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
 	pool, err := pgxpool.Connect(ctx, p.config.DBConfig)
 	if err != nil {
@@ -107,12 +106,10 @@ func (p *Probe) Run() error {
 		return fmt.Errorf("starting scan: %w", err)
 	}
 
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
 	tick := time.NewTicker(sensors.UpdateDelayDB)
 	defer tick.Stop()
 
+Loop:
 	for {
 		select {
 		case report := <-reportChan:
@@ -132,8 +129,11 @@ func (p *Probe) Run() error {
 				}
 			}
 
-		case sig := <-sigs:
-			log.Printf("signal received: %s", sig)
+		case <-ctx.Done():
+			log.Printf("signal received (%v); starting shutdown", ctx.Err())
+			// we call stop() on the context here, so that further interrupt signals will
+			// forcefully terminate the program.
+			stopCtx()
 
 			log.Print("stopping bluetooth scan")
 			if err := hostRadio.StopScanning(); err != nil {
@@ -141,11 +141,17 @@ func (p *Probe) Run() error {
 			}
 
 			log.Print("stopping homekit subsystem")
-			<-hkTransport.Stop()
-
-			return nil
+			select {
+			case <-time.After(20 * time.Second):
+				log.Print("timeout while waiting for homekit subsystem to stop")
+				break Loop
+			case <-hkTransport.Stop():
+				break Loop
+			}
 		}
 	}
+
+	return nil
 }
 
 // buildFilters builds a filter set for bluewalker to only capture events sent from devices
