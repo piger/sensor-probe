@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -87,6 +88,11 @@ func ReadConfig(filename string) (*Config, error) {
 
 	if err := config.Validate(); err != nil {
 		return nil, err
+	}
+
+	// set all the MAC addresses to uppercase
+	for i := range config.Sensors {
+		config.Sensors[i].MAC = strings.ToUpper(config.Sensors[i].MAC)
 	}
 
 	return &config, nil
