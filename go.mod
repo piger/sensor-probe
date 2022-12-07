@@ -1,6 +1,6 @@
 module github.com/piger/sensor-probe
 
-go 1.17
+go 1.18
 
 require (
 	github.com/brutella/hc v1.2.4
