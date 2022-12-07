@@ -4,13 +4,15 @@ go 1.17
 
 require (
 	github.com/brutella/hc v1.2.4
+	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/jackc/pgx/v4 v4.14.1
 	github.com/mdp/qrterminal/v3 v3.0.0
-	github.com/pelletier/go-toml/v2 v2.0.0-beta.4
+	github.com/pelletier/go-toml/v2 v2.0.6
 	gitlab.com/jtaimisto/bluewalker v0.2.5
 )
 
 require (
+	github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496 // indirect
 	github.com/brutella/dnssd v1.2.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.10.1 // indirect
