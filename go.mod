@@ -7,7 +7,7 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/jackc/pgx/v4 v4.18.1
 	github.com/mdp/qrterminal/v3 v3.0.0
-	github.com/pelletier/go-toml/v2 v2.0.6
+	github.com/pelletier/go-toml/v2 v2.0.7
 	gitlab.com/jtaimisto/bluewalker v0.2.5
 )
 
