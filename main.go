@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"runtime/debug"
 
 	hcLog "github.com/brutella/hc/log"
 	"github.com/pelletier/go-toml/v2"
@@ -20,18 +19,6 @@ var (
 	debugHk     = flag.Bool("debug-hk", false, "Enable HomeKit debugging")
 	showVersion = flag.Bool("version", false, "Print version information")
 )
-
-func Version() string {
-	if info, ok := debug.ReadBuildInfo(); ok {
-		for _, setting := range info.Settings {
-			if setting.Key == "vcs.revision" {
-				return setting.Value
-			}
-		}
-	}
-
-	return "unknown"
-}
 
 func run() error {
 	cfg, err := config.ReadConfig(*configFile)
@@ -52,7 +39,11 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("sensor-probe %s\n", Version())
+		version, err := getVersion()
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(version)
 		return
 	}
 
