@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -33,6 +34,7 @@ type HomeKit struct {
 	Pin     string `toml:"pin"`
 	Port    int    `toml:"port"`
 	SetupID string `toml:"setup_id"`
+	DataDir string `toml"data_dir"`
 }
 
 func (hk HomeKit) Validate() error {
@@ -88,6 +90,18 @@ func ReadConfig(filename string) (*Config, error) {
 
 	if err := config.Validate(); err != nil {
 		return nil, err
+	}
+
+	// Determine the data directory: if the option is unset it defaults to $XDG_CONFIG_HOME/sensor-probe,
+	// otherwise it uses the value provided and expand any environment variable found in it, for example $HOME.
+	if config.HomeKit.DataDir == "" {
+		configDir, err := os.UserConfigDir()
+		if err != nil {
+			return nil, fmt.Errorf("cannot determine $XDG_CONFIG_HOME, likely because $HOME is unset: %w", err)
+		}
+		config.HomeKit.DataDir = path.Join(configDir, "sensor-probe")
+	} else {
+		config.HomeKit.DataDir = os.ExpandEnv(config.HomeKit.DataDir)
 	}
 
 	// set all the MAC addresses to uppercase

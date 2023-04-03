@@ -69,9 +69,10 @@ func SetupHomeKit(config *config.HomeKit, accs []*accessory.Accessory) (HomeKitT
 	})
 
 	hkConfig := hc.Config{
-		Pin:     config.Pin,
-		SetupId: config.SetupID,
-		Port:    strconv.Itoa(config.Port),
+		Pin:         config.Pin,
+		SetupId:     config.SetupID,
+		Port:        strconv.Itoa(config.Port),
+		StoragePath: config.DataDir,
 	}
 	hkTransport, err := hc.NewIPTransport(hkConfig, hkBridge.Accessory, accs...)
 	if err != nil {
