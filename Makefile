@@ -3,11 +3,11 @@ GIT_TAG := $(shell git describe --tags)
 LDFLAGS := -ldflags "-X main.Version=$(GIT_TAG)"
 
 sensor-probe: $(SOURCE_FILES)
-	go build $(LDFLAGS)
+	env CGO_ENABLED=0 go build $(LDFLAGS)
 
 .PHONY: build-arm
 build-arm: $(SOURCE_FILES)
-	env GOOS=linux GOARCH=arm GOARM=5 go build $(LDFLAGS) -o sensor-probe.arm5
+	env CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=5 go build $(LDFLAGS) -o sensor-probe.arm5
 
 .PHONY: test
 test:
