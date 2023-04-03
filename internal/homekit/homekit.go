@@ -1,17 +1,32 @@
 package homekit
 
 import (
+	_ "embed"
+	"encoding/base64"
 	"fmt"
-	"io"
+	"html/template"
 	"log"
+	"net"
+	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/brutella/hc"
 	"github.com/brutella/hc/accessory"
 	"github.com/brutella/hc/service"
-	"github.com/mdp/qrterminal/v3"
 	"github.com/piger/sensor-probe/internal/config"
+	"rsc.io/qr"
 )
+
+var (
+	//go:embed webpage.html
+	webpage     string
+	webTemplate *template.Template
+)
+
+func init() {
+	webTemplate = template.Must(template.New("").Parse(webpage))
+}
 
 type HomeKitTransport interface {
 	// Start starts the transport
@@ -66,11 +81,28 @@ func SetupHomeKit(config *config.HomeKit, accs []*accessory.Accessory) (HomeKitT
 	return hkTransport, nil
 }
 
-func PrintQRcode(t HomeKitTransport, w io.Writer) {
-	uri, err := t.XHMURI()
-	if err != nil {
-		log.Printf("error getting XHM URI: %s", err)
-		return
+// StartHttpServer starts an HTTP server meant to only serve the setup QR code to the user.
+func StartHttpServer(listener net.Listener, hkURI string) error {
+	server := http.Server{
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
 	}
-	qrterminal.Generate(uri, qrterminal.L, w)
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		code, err := qr.Encode(hkURI, qr.H)
+		if err != nil {
+			log.Printf("error generating QR code: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if err := webTemplate.Execute(w, base64.StdEncoding.EncodeToString(code.PNG())); err != nil {
+			log.Printf("error serving root page: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	})
+
+	return server.Serve(listener)
 }

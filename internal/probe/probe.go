@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -90,7 +91,24 @@ func (p *Probe) Run() error {
 	if err != nil {
 		return err
 	}
-	homekit.PrintQRcode(hkTransport, os.Stdout)
+
+	// Start an HTTP server on a random free port, to show the HomeKit setup QR code.
+	homeKitURI, err := hkTransport.XHMURI()
+	if err != nil {
+		return err
+	}
+
+	httpListener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return err
+	}
+	log.Printf("starting HTTP server on port %d", httpListener.Addr().(*net.TCPAddr).Port)
+
+	go func() {
+		if err := homekit.StartHttpServer(httpListener, homeKitURI); err != nil {
+			log.Printf("error from HTTP server: %s", err)
+		}
+	}()
 
 	log.Println("starting HomeKit subsystem")
 	go hkTransport.Start()

@@ -6,9 +6,9 @@ require (
 	github.com/brutella/hc v1.2.5
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/jackc/pgx/v4 v4.18.1
-	github.com/mdp/qrterminal/v3 v3.0.0
 	github.com/pelletier/go-toml/v2 v2.0.7
 	gitlab.com/jtaimisto/bluewalker v0.3.1
+	rsc.io/qr v0.2.0
 )
 
 require (
@@ -32,5 +32,4 @@ require (
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/tools v0.3.0 // indirect
-	rsc.io/qr v0.2.0 // indirect
 )
