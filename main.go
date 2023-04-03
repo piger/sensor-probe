@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 
 	hcLog "github.com/brutella/hc/log"
 	"github.com/pelletier/go-toml/v2"
@@ -13,41 +12,10 @@ import (
 	"github.com/piger/sensor-probe/internal/probe"
 )
 
-var (
-	device      = flag.String("device", "hci0", "Bluetooth device")
-	configFile  = flag.String("config", "sensor-probe.toml", "Path to the configuration file")
-	debugHk     = flag.Bool("debug-hk", false, "Enable HomeKit debugging")
-	showVersion = flag.Bool("version", false, "Print version information")
-)
-
-func run() error {
-	cfg, err := config.ReadConfig(*configFile)
+// readConfig wraps the clunky error handling of go-toml to show nice error messages.
+func readConfig(filename string) (*config.Config, error) {
+	cfg, err := config.ReadConfig(filename)
 	if err != nil {
-		return err
-	}
-
-	probe := probe.New(*device, cfg)
-
-	if *debugHk {
-		hcLog.Debug.Enable()
-	}
-
-	return probe.Run()
-}
-
-func main() {
-	flag.Parse()
-
-	if *showVersion {
-		version, err := getVersion()
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(version)
-		return
-	}
-
-	if err := run(); err != nil {
 		var derr *toml.DecodeError
 		var sterr *toml.StrictMissingError
 		switch {
@@ -56,13 +24,52 @@ func main() {
 			fmt.Println(derr.String())
 			row, col := derr.Position()
 			fmt.Printf("error at row %d, column %d\n", row, col)
-			os.Exit(1)
 		case errors.As(err, &sterr):
 			fmt.Println("configuration error:")
 			fmt.Println(sterr.String())
-			os.Exit(1)
 		default:
-			log.Fatalf("error: %s", err)
+			fmt.Printf("error: %s\n", err)
 		}
+
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+func main() {
+	var (
+		deviceFlag       string
+		configFileFlag   string
+		debugHomeKitFlag bool
+		versionFlag      bool
+	)
+	flag.StringVar(&deviceFlag, "device", "hci0", "Name of the Bluetooth device used to listen for BLE messages")
+	flag.StringVar(&configFileFlag, "config", "sensor-probe.toml", "Configuration file name")
+	flag.BoolVar(&debugHomeKitFlag, "debug-hk", false, "Enable to turn on the debugging for the HomeKit subsystem")
+	flag.BoolVar(&versionFlag, "version", false, "Show the program's version")
+	flag.Parse()
+
+	if versionFlag {
+		version, err := getVersion()
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(version)
+		return
+	}
+
+	cfg, err := readConfig(configFileFlag)
+	if err != nil {
+		log.Fatalf("error reading configuration: %s", err)
+	}
+
+	if debugHomeKitFlag {
+		hcLog.Debug.Enable()
+	}
+
+	p := probe.New(deviceFlag, cfg)
+	if err := p.Run(); err != nil {
+		log.Fatal(err)
 	}
 }
