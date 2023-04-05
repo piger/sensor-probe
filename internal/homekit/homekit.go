@@ -90,17 +90,20 @@ func StartHttpServer(listener net.Listener, hkURI string) error {
 		MaxHeaderBytes: 1 << 20,
 	}
 
+	httpError := func(w http.ResponseWriter, format string, args ...any) {
+		log.Printf(format, args...)
+		http.Error(w, fmt.Sprintf(format, args...), http.StatusInternalServerError)
+	}
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		code, err := qr.Encode(hkURI, qr.H)
 		if err != nil {
-			log.Printf("error generating QR code: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			httpError(w, "error generating QR code: %s", err)
 			return
 		}
 
 		if err := webTemplate.Execute(w, base64.StdEncoding.EncodeToString(code.PNG())); err != nil {
-			log.Printf("error serving root page: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			httpError(w, "error serving root page: %s", err)
 			return
 		}
 	})
