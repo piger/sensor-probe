@@ -34,7 +34,7 @@ type HomeKit struct {
 	Pin     string `toml:"pin"`
 	Port    int    `toml:"port"`
 	SetupID string `toml:"setup_id"`
-	DataDir string `toml"data_dir"`
+	DataDir string `toml:"data_dir"`
 }
 
 func (hk HomeKit) Validate() error {
