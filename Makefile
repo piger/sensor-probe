@@ -17,3 +17,7 @@ test:
 lint:
 	go vet ./...
 	staticcheck ./...
+
+.PHONY: clean
+clean:
+	rm -f sensor-probe sensor-probe.arm5
