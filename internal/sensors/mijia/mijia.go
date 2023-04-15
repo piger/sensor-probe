@@ -112,7 +112,7 @@ func (m *MijiaSensor) handleBroadcast(msg *hci.AdStructure) error {
 	now := time.Now()
 	// log.Printf("%q (%s): T=%.2f H=%.2f%% B=%d%%", m.Name, m.MAC, data.Temperature, data.Humidity, data.Battery)
 
-	if m.LastUpdateHomeKit.IsZero() || now.Sub(m.LastUpdateHomeKit) >= sensors.UpdateDelayHk {
+	if m.LastUpdateHomeKit.IsZero() || now.Sub(m.LastUpdateHomeKit) >= sensors.HomeKitUpdateInterval {
 		m.SetTemperature(float64(data.Temperature))
 		m.SetHumidity(float64(data.Humidity))
 		m.LastUpdateHomeKit = now

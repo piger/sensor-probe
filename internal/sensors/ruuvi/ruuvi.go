@@ -145,7 +145,7 @@ func (rv *RuuviSensor) handleBroadcast(msg *hci.AdStructure) error {
 	now := time.Now()
 	// log.Printf("%q (%s): T=%.2f H=%.2f%% P=%d Tx=%ddBm V=%dV", rv.Name, rv.MAC, data.Temperature, data.Humidity, data.Pressure, data.TxPower, data.Voltage)
 
-	if rv.LastUpdateHomeKit.IsZero() || now.Sub(rv.LastUpdateHomeKit) >= sensors.UpdateDelayHk {
+	if rv.LastUpdateHomeKit.IsZero() || now.Sub(rv.LastUpdateHomeKit) >= sensors.HomeKitUpdateInterval {
 		rv.SetTemperature(float64(data.Temperature))
 		rv.SetHumidity(float64(data.Humidity))
 		rv.LastUpdateHomeKit = now

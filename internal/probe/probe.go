@@ -124,7 +124,7 @@ func (p *Probe) Run() error {
 		return fmt.Errorf("starting scan: %w", err)
 	}
 
-	tick := time.NewTicker(sensors.UpdateDelayDB)
+	tick := time.NewTicker(sensors.DatabaseUpdateInterval)
 	defer tick.Stop()
 
 Loop:

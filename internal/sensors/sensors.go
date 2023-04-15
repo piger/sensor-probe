@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	UpdateDelayHk = 2 * time.Minute
-	UpdateDelayDB = 5 * time.Minute
+	HomeKitUpdateInterval  = 2 * time.Minute
+	DatabaseUpdateInterval = 5 * time.Minute
 )
 
 type Sensor struct {
