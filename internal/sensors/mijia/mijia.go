@@ -22,6 +22,10 @@ import (
 	"gitlab.com/jtaimisto/bluewalker/host"
 )
 
+// Manufacturer ID for the custom firmware; see also:
+// https://github.com/atc1441/ATC_MiThermometer#advertising-format-of-the-custom-firmware
+const UUID = 0x181a
+
 type payload struct {
 	UUID         uint16
 	MAC          [6]uint8
@@ -54,8 +58,6 @@ func parseMessage(b []byte) (*Data, error) {
 	}
 	return &data, nil
 }
-
-const UUID = 0x181a
 
 func checkReport(r *hci.AdStructure) bool {
 	return r.Typ == hci.AdServiceData && len(r.Data) >= 2 && binary.LittleEndian.Uint16(r.Data) == UUID

@@ -22,6 +22,9 @@ import (
 	"gitlab.com/jtaimisto/bluewalker/host"
 )
 
+// Manufacturer ID: Ruuvi Innovations Ltd.
+const UUID = 0x0499
+
 // v5 format
 type payload struct {
 	UUID            uint16 // 0x0499, manufacturer ID
@@ -49,15 +52,6 @@ type Data struct {
 	TxPower       int
 	MoveCount     int
 	Seq           int
-}
-
-var columnNames = []string{
-	"time",
-	"temperature",
-	"humidity",
-	"pressure",
-	"voltage",
-	"txpower",
 }
 
 // TODO is the data prefixed by the manufacturer ID?? 0x0499 (2 bytes)
@@ -98,8 +92,6 @@ func parseMessage(b []byte) (*Data, error) {
 
 	return &data, nil
 }
-
-const UUID = 0x0499
 
 func checkReport(r *hci.AdStructure) bool {
 	return r.Typ == hci.AdManufacturerSpecific && len(r.Data) >= 2 && binary.LittleEndian.Uint16(r.Data) == UUID
@@ -160,6 +152,15 @@ func (rv *RuuviSensor) handleBroadcast(msg *hci.AdStructure) error {
 	}
 
 	return nil
+}
+
+var columnNames = []string{
+	"time",
+	"temperature",
+	"humidity",
+	"pressure",
+	"voltage",
+	"txpower",
 }
 
 func (rv *RuuviSensor) Push(ctx context.Context, pool *pgxpool.Pool, t time.Time) error {
