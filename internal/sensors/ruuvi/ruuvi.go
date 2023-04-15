@@ -63,9 +63,9 @@ var columnNames = []string{
 // TODO is the data prefixed by the manufacturer ID?? 0x0499 (2 bytes)
 // and if so should we skip it? how does the mijia parser handle it??
 
-func parseMessage(ads *hci.AdStructure) (*Data, error) {
+func parseMessage(b []byte) (*Data, error) {
 	var p payload
-	buf := bytes.NewBuffer(ads.Data)
+	buf := bytes.NewBuffer(b)
 	if err := binary.Read(buf, binary.BigEndian, &p); err != nil {
 		return nil, err
 	}
@@ -143,8 +143,8 @@ func (rv *RuuviSensor) Update(report *host.ScanReport) error {
 	return nil
 }
 
-func (rv *RuuviSensor) handleBroadcast(b *hci.AdStructure) error {
-	data, err := parseMessage(b)
+func (rv *RuuviSensor) handleBroadcast(msg *hci.AdStructure) error {
+	data, err := parseMessage(msg.Data)
 	if err != nil {
 		return err
 	}

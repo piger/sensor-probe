@@ -39,9 +39,9 @@ type Data struct {
 	BatteryVolt float32
 }
 
-func parseMessage(ads *hci.AdStructure) (*Data, error) {
+func parseMessage(b []byte) (*Data, error) {
 	var p payload
-	buf := bytes.NewBuffer(ads.Data)
+	buf := bytes.NewBuffer(b)
 	if err := binary.Read(buf, binary.BigEndian, &p); err != nil {
 		return nil, err
 	}
@@ -100,8 +100,8 @@ func (m *MijiaSensor) Update(report *host.ScanReport) error {
 	return nil
 }
 
-func (m *MijiaSensor) handleBroadcast(b *hci.AdStructure) error {
-	data, err := parseMessage(b)
+func (m *MijiaSensor) handleBroadcast(msg *hci.AdStructure) error {
+	data, err := parseMessage(msg.Data)
 	if err != nil {
 		return err
 	}
