@@ -68,7 +68,18 @@ func parseMessage(b []byte) (*Data, error) {
 		return nil, fmt.Errorf("wrong data format: %d", p.Format)
 	}
 
-	// 0xFFFF - 0x001F (mask for 5 bits) = 0xFFE0
+	// https://docs.ruuvi.com/communication/bluetooth-advertisements/data-format-5-rawv2
+	//
+	// Power info (11+5bit unsigned), first 11 bits is the battery voltage above 1.6V, in millivolts
+	// (1.6V to 3.646V range). Last 5 bits unsigned are the TX power above -40dBm, in 2dBm steps.
+	// (-40dBm to +20dBm range)
+	//
+	// 0xFFFF = 0b1111111111111111 (16 bits)
+	// 0xFFE0 = 0b1111111111100000
+	// 0x001F = 0b11111
+	//
+	// Do a bitwise AND to keep the first 11 bits and set the others to 0,
+	// then shift by 5 bits.
 	tmp := (p.PowerInfo & 0xFFE0) >> 5
 	voltage := int(1600 + tmp)
 
