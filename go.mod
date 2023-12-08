@@ -8,6 +8,7 @@ require (
 	github.com/jackc/pgx/v4 v4.18.1
 	github.com/pelletier/go-toml/v2 v2.0.7
 	gitlab.com/jtaimisto/bluewalker v0.3.1
+	golang.org/x/net v0.6.0
 	rsc.io/qr v0.2.0
 )
 
@@ -28,7 +29,6 @@ require (
 	github.com/xiam/to v0.0.0-20191116183551-8328998fc0ed // indirect
 	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/mod v0.7.0 // indirect
-	golang.org/x/net v0.6.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/tools v0.3.0 // indirect

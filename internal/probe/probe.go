@@ -2,6 +2,7 @@ package probe
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -21,6 +22,7 @@ import (
 	"gitlab.com/jtaimisto/bluewalker/filter"
 	"gitlab.com/jtaimisto/bluewalker/hci"
 	"gitlab.com/jtaimisto/bluewalker/host"
+	"golang.org/x/net/proxy"
 )
 
 // Probe is the structure that holds the state of this program.
@@ -60,7 +62,28 @@ func (p *Probe) Run() error {
 
 	ctx, stopCtx := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
-	pool, err := pgxpool.Connect(ctx, p.config.DBConfig)
+	pgConfig, err := pgxpool.ParseConfig(p.config.DBConfig)
+	if err != nil {
+		return err
+	}
+
+	socksProxy := os.Getenv("SOCKS_PROXY")
+	if socksProxy != "" {
+		dialer, err := proxy.SOCKS5("tcp", socksProxy, nil, proxy.Direct)
+		if err != nil {
+			return err
+		}
+
+		if contextDialer, ok := dialer.(proxy.ContextDialer); ok {
+			pgConfig.ConnConfig.DialFunc = contextDialer.DialContext
+		} else {
+			return errors.New("failed type assertion into ContextDialer")
+		}
+
+		log.Printf("Using SOCKS5 proxy at %s", socksProxy)
+	}
+
+	pool, err := pgxpool.ConnectConfig(ctx, pgConfig)
 	if err != nil {
 		return err
 	}
